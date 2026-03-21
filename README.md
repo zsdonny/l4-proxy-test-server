@@ -153,6 +153,5 @@ ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 \
 
 ## License
 
-Big Buck Bunny © Blender Foundation — [CC-BY-3.0](https://creativecommons.org/licenses/by/3.0/).
-
-This project is provided as-is for testing purposes.
+- Source code in this repository is licensed under the [MIT License](LICENSE).
+- Bundled video asset `bigbuckbunny.ts` (Big Buck Bunny) is © Blender Foundation and distributed under [CC-BY-3.0](https://creativecommons.org/licenses/by/3.0/).
