@@ -32,15 +32,6 @@ python server.py
 
 If FFmpeg is not found, the server still works — you just won’t get automatic video. You can send your own MPEG-TS stream to the UDP port instead.
 
-### Git LFS
-
-The `bigbuckbunny.ts` video file is tracked with [Git LFS](https://git-lfs.com/). After cloning, run:
-
-```bash
-git lfs install
-git lfs pull
-```
-
 ## Usage
 
 ### TCP — Plain HTTP
