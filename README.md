@@ -18,8 +18,8 @@ A lightweight test server for verifying **L4 proxy route** configurations. Origi
 ### Run with Docker
 
 ```bash
-docker build -t test-stream .
-docker run -d --name test-stream -p 11111:11111/tcp -p 22222:22222/udp test-stream
+docker pull ghcr.io/zsdonny/l4-proxy-test-server:latest
+docker run -d --name test-stream -p 11111:11111/tcp -p 22222:22222/udp ghcr.io/zsdonny/l4-proxy-test-server:latest
 ```
 
 ### Run directly with Python
