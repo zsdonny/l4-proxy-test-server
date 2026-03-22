@@ -127,6 +127,7 @@ _VIDEO_JS = """
   var defaultUdp   = __UDP_PORT__;
   var statusEl     = document.getElementById('video-status');
   var canvasEl     = document.getElementById('video-canvas');
+  var ipInput      = document.getElementById('udp-target-ip');
   var udpInput     = document.getElementById('udp-target-port');
   var btn          = document.getElementById('retarget-btn');
   var flowEl       = document.getElementById('flow-diagram');
@@ -148,12 +149,12 @@ _VIDEO_JS = """
     statusEl.textContent = msg;
   }
 
-  function updateFlow(targetPort) {
+  function updateFlow(targetIp, targetPort) {
     if (!flowEl) return;
-    if (targetPort == defaultUdp) {
+    if (targetPort == defaultUdp && targetIp === '127.0.0.1') {
       flowEl.innerHTML = 'FFmpeg \\u2192 <b>UDP :' + targetPort + '</b> (direct) \\u2192 server \\u2192 HTTP stream \\u2192 Browser';
     } else {
-      flowEl.innerHTML = 'FFmpeg \\u2192 <b>UDP :' + targetPort + '</b> \\u2192 L4 proxy \\u2192 UDP :' + defaultUdp + ' \\u2192 server \\u2192 HTTP stream \\u2192 Browser';
+      flowEl.innerHTML = 'FFmpeg \\u2192 <b>UDP ' + targetIp + ':' + targetPort + '</b> \\u2192 L4 proxy \\u2192 UDP :' + defaultUdp + ' \\u2192 server \\u2192 HTTP stream \\u2192 Browser';
     }
   }
 
@@ -194,9 +195,12 @@ _VIDEO_JS = """
       fetch('/api/status').then(function(r){ return r.json(); }).then(function(d) {
         // Sync input & flow if another session changed the FFmpeg target
         if (!isSending && knownTarget !== null && d.ffmpeg_target !== knownTarget) {
-          var syncPort = parseInt(d.ffmpeg_target.split(':')[1], 10);
+          var syncParts = d.ffmpeg_target.split(':');
+          var syncIp   = syncParts[0];
+          var syncPort = parseInt(syncParts[1], 10);
+          ipInput.value  = syncIp;
           udpInput.value = syncPort;
-          updateFlow(syncPort);
+          updateFlow(syncIp, syncPort);
           stallTicks = 0;
           riseTicks = 0;
           ppsHistory = [];
@@ -331,16 +335,17 @@ _VIDEO_JS = """
   }
 
   window.retargetFFmpeg = function() {
+    var ip   = (ipInput ? ipInput.value.trim() : '') || '127.0.0.1';
     var port = parseInt(udpInput.value, 10);
     if (!port || port < 1 || port > 65535) { setStatus('error', 'Invalid port number.'); return; }
     btn.disabled = true;
     isSending = true;
-    setStatus('connecting', 'Sending FFmpeg to UDP port ' + port + ' \\u2026');
-    updateFlow(port);
+    setStatus('connecting', 'Sending FFmpeg to UDP ' + ip + ':' + port + ' \\u2026');
+    updateFlow(ip, port);
     fetch('/api/ffmpeg-target', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({port: port})
+      body: JSON.stringify({ip: ip, port: port})
     })
     .then(function(r){ return r.json(); })
     .then(function(d) {
@@ -348,7 +353,7 @@ _VIDEO_JS = """
       isSending = false;
       if (d.ok) {
         knownTarget = d.target;  // sync so next poll won't treat this as an external change
-        setStatus('connecting', 'FFmpeg retargeted to UDP :' + port + '. Waiting for packets \\u2026');
+        setStatus('connecting', 'FFmpeg retargeted to UDP ' + ip + ':' + port + '. Waiting for packets \\u2026');
         startPolling();
         connectPlayer();
       } else {
@@ -365,14 +370,17 @@ _VIDEO_JS = """
   // Init — sync input/flow from server state before first poll
   setStatus('connecting', 'Connecting to video stream \\u2026');
   fetch('/api/status').then(function(r){ return r.json(); }).then(function(d) {
-    var serverPort = parseInt(d.ffmpeg_target.split(':')[1], 10);
+    var parts      = d.ffmpeg_target.split(':');
+    var serverIp   = parts[0];
+    var serverPort = parseInt(parts[1], 10);
+    if (ipInput) ipInput.value = serverIp;
     udpInput.value = serverPort;
     knownTarget = d.ffmpeg_target;
-    updateFlow(serverPort);
+    updateFlow(serverIp, serverPort);
     connectPlayer();
     startPolling();
   }).catch(function() {
-    updateFlow(defaultUdp);
+    updateFlow('127.0.0.1', defaultUdp);
     connectPlayer();
     startPolling();
   });
@@ -399,13 +407,15 @@ def build_page(title, tag_class, tag_text, rows, footer=""):
 <h2>UDP Video Stream Demo</h2>
 <p class="subtitle">Big Buck Bunny &copy; Blender Foundation &mdash; CC-BY-3.0</p>
 <div class="video-controls">
-  <label for="udp-target-port">FFmpeg UDP Target Port:</label>
+  <label for="udp-target-ip">IP:</label>
+  <input type="text" id="udp-target-ip" value="127.0.0.1" placeholder="127.0.0.1" style="width:130px">
+  <label for="udp-target-port">Port:</label>
   <input type="number" id="udp-target-port" value="{UDP_PORT}" min="1" max="65535">
   <button id="retarget-btn" onclick="retargetFFmpeg()">Send</button>
 </div>
 <p class="subtitle" style="margin:4px 0">
-    Default port <span class="port-val">{UDP_PORT}</span> = direct (no proxy).  Enter a proxied
-  UDP port to test L4 routing.
+    Default <span class="port-val">127.0.0.1:{UDP_PORT}</span> = direct (no proxy).  Enter a proxied
+  IP&nbsp;&amp;&nbsp;port to test L4 routing.
 </p>
 <div id="video-status" class="st-idle">Initializing&hellip;</div>
 <div id="flow-diagram" class="flow"></div>
@@ -555,10 +565,16 @@ def handle_api(conn, method, path, body):
         try:
             obj = json.loads(body)
             port = int(obj.get("port", 0))
+            ip = obj.get("ip", None)
             if port < 1 or port > 65535:
                 conn.sendall(json_response({"ok": False, "error": "Invalid port"}, "400 Bad Request"))
                 return True
-            ok, msg = ffmpeg_retarget(port)
+            if ip is not None:
+                # Validate: allow IPv4 dotted-decimal or plain hostname (letters, digits, dots, hyphens)
+                if not re.match(r'^[A-Za-z0-9][A-Za-z0-9.\-]{0,252}$', ip):
+                    conn.sendall(json_response({"ok": False, "error": "Invalid IP/host"}, "400 Bad Request"))
+                    return True
+            ok, msg = ffmpeg_retarget(port, ip)
             conn.sendall(json_response({"ok": ok, "target": msg}))
         except Exception as exc:
             conn.sendall(json_response({"ok": False, "error": str(exc)}, "400 Bad Request"))
@@ -942,8 +958,8 @@ class FFmpegManager:
                 time.sleep(1)
         threading.Thread(target=run, daemon=True).start()
 
-    def retarget(self, port):
-        """Kill current FFmpeg and restart aiming at a new UDP port."""
+    def retarget(self, port, ip=None):
+        """Kill current FFmpeg and restart aiming at a new UDP host:port."""
         global udp_pkt_count, _ts_cc_errors, _dgram_bad
         if not self.available:
             return False, "FFmpeg not available"
@@ -954,10 +970,14 @@ class FFmpegManager:
         # 2. Bump generation so ALL old spawn threads exit
         with self.lock:
             self._generation += 1
-            # Direct (default port) → loopback; proxy test → Docker host
-            if port == UDP_PORT:
+            if ip is not None:
+                # Explicit IP supplied by caller (e.g. from the web UI)
+                self.target = f"{ip}:{port}"
+            elif port == UDP_PORT:
+                # Direct (default port) → loopback
                 self.target = f"127.0.0.1:{port}"
             else:
+                # Proxy test → Docker host (or loopback on desktop)
                 self.target = f"{DOCKER_HOST}:{port}"
             if self.proc:
                 try:
@@ -1004,8 +1024,8 @@ class FFmpegManager:
 ffmpeg_mgr = FFmpegManager()
 
 
-def ffmpeg_retarget(port):
-    return ffmpeg_mgr.retarget(port)
+def ffmpeg_retarget(port, ip=None):
+    return ffmpeg_mgr.retarget(port, ip)
 
 
 # ---------------------------------------------------------------------------
