@@ -43,6 +43,7 @@ jobs:
         run: |
           $exePath = "dist\L4-Proxy-Test-Server\L4-Proxy-Test-Server.exe"
           if (Test-Path $exePath) {
+            Copy-Item -Path $exePath -Destination "L4-Proxy-Test-Server.exe" -Force
             $hash = (Get-FileHash -Path $exePath -Algorithm SHA256).Hash
             "$hash  L4-Proxy-Test-Server.exe" | Out-File -FilePath "L4-Proxy-Test-Server.exe.sha256"
             Write-Host "SHA256: $hash"
@@ -57,7 +58,7 @@ jobs:
         with:
           name: windows-exe
           path: |
-            dist/L4-Proxy-Test-Server/**
+            L4-Proxy-Test-Server.exe
             L4-Proxy-Test-Server.exe.sha256
 
   build-macos:
@@ -83,20 +84,25 @@ jobs:
 
       - name: Create distribution zip
         run: |
-          cd dist
-          zip -r "L4-Proxy-Test-Server-macos.zip" "L4 Proxy Test Server.app"
-          cd ..
+          APP_PATH="dist/L4 Proxy Test Server.app"
+          ZIP_PATH="L4-Proxy-Test-Server-macos.zip"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Expected app bundle not found: $APP_PATH"
+            ls -la dist
+            exit 1
+          fi
+          ditto -c -k --keepParent "$APP_PATH" "$ZIP_PATH"
 
       - name: Compute checksums
         run: |
-          sha256sum "dist/L4-Proxy-Test-Server-macos.zip" | tee "L4-Proxy-Test-Server-macos.zip.sha256"
+          shasum -a 256 "L4-Proxy-Test-Server-macos.zip" | tee "L4-Proxy-Test-Server-macos.zip.sha256"
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-app
           path: |
-            dist/L4-Proxy-Test-Server-macos.zip
+            L4-Proxy-Test-Server-macos.zip
             L4-Proxy-Test-Server-macos.zip.sha256
 
   create-release:
@@ -120,7 +126,11 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ github.ref_name }}
-          artifacts: "release-artifacts/**/*"
+          artifacts: |
+            release-artifacts/windows-exe/L4-Proxy-Test-Server.exe
+            release-artifacts/windows-exe/L4-Proxy-Test-Server.exe.sha256
+            release-artifacts/macos-app/L4-Proxy-Test-Server-macos.zip
+            release-artifacts/macos-app/L4-Proxy-Test-Server-macos.zip.sha256
           artifactErrorsFailBuild: false
           generateReleaseNotes: true
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
