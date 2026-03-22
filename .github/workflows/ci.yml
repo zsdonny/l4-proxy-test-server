@@ -29,4 +29,5 @@ jobs:
         run: python -m py_compile server.py
 
       - name: Verify version constant
-        run: python -c "exec(open('server.py').read().split('import')[0]); print(f'Version: {__version__}')"
+        run: |
+          python -c "exec(open('server.py').read().split('import')[0]); print(f'Version: {__version__}')"
