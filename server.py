@@ -27,6 +27,7 @@ import signal
 import socket
 import struct
 import subprocess
+import sys
 import threading
 import time
 
@@ -868,12 +869,24 @@ DOCKER_HOST = _detect_docker_context()
 # Video asset path: Try bundled .ts file first, fall back to downloading
 VIDEO_LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bigbuckbunny.ts")
 
+def _find_ffmpeg():
+    """Return path to ffmpeg binary, preferring the one bundled by PyInstaller."""
+    if getattr(sys, 'frozen', False):
+        # Running inside a PyInstaller bundle — check the extraction directory first.
+        ext = '.exe' if sys.platform == 'win32' else ''
+        bundled = os.path.join(sys._MEIPASS, f'ffmpeg{ext}')
+        if os.path.exists(bundled):
+            return bundled
+    return shutil.which('ffmpeg')
+
+
 class FFmpegManager:
     def __init__(self):
         self.proc = None
         self.target = f"127.0.0.1:{UDP_PORT}"
         self.lock = threading.Lock()
-        self.available = shutil.which("ffmpeg") is not None
+        self._ffmpeg_bin = _find_ffmpeg()
+        self.available = self._ffmpeg_bin is not None
         self._local_ready = False
         self._generation = 0        # bumped on retarget; stale threads check & exit
         self.accept_packets = True   # gate checked by udp_server
@@ -891,7 +904,7 @@ class FFmpegManager:
         if self._local_ready:
             # Loop pre-transcoded MPEG-TS with copy — no re-encoding, clean loop
             return [
-                "ffmpeg", "-loglevel", "warning",
+                self._ffmpeg_bin, "-loglevel", "warning",
                 "-re",
                 "-i", VIDEO_LOCAL,
                 "-f", "mpegts",
@@ -900,7 +913,7 @@ class FFmpegManager:
                 f"udp://{self.target}?pkt_size=1316",
             ]
         return [
-            "ffmpeg", "-loglevel", "warning",
+            self._ffmpeg_bin, "-loglevel", "warning",
             "-re",
             "-i", VIDEO_URL,
             "-f", "mpegts",

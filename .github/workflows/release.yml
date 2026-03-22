@@ -33,11 +33,46 @@ jobs:
       - name: Install PyInstaller
         run: pip install PyInstaller --quiet
 
+      - name: Download static ffmpeg (Windows)
+        run: |
+          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+          $zip = "ffmpeg-win64.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip -MaximumRetryCount 3
+          Expand-Archive -Path $zip -DestinationPath "build\" -Force
+          $extracted = Get-ChildItem "build\" -Directory | Where-Object { $_.Name -like "ffmpeg-master-*" } | Select-Object -First 1
+          Rename-Item $extracted.FullName "build\ffmpeg-win64"
+          $ffmpegExe = "build\ffmpeg-win64\bin\ffmpeg.exe"
+          Write-Host "ffmpeg path: $((Resolve-Path $ffmpegExe).Path)"
+          echo "FFMPEG_BIN=$((Resolve-Path $ffmpegExe).Path)" >> $env:GITHUB_ENV
+
       - name: Build Windows .exe
         run: pyinstaller pyinstaller-windows.spec
+        env:
+          FFMPEG_BIN: ${{ env.FFMPEG_BIN }}
 
       - name: List build output
         run: Get-ChildItem -Recurse dist | Select-Object FullName, Length
+
+      - name: Sign Windows .exe (Authenticode)
+        if: ${{ secrets.WIN_CERT_BASE64 != '' }}
+        env:
+          WIN_CERT_BASE64: ${{ secrets.WIN_CERT_BASE64 }}
+          WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+          WIN_SIGN_TIMESTAMP_URL: ${{ vars.WIN_SIGN_TIMESTAMP_URL || 'http://timestamp.digicert.com' }}
+        run: |
+          $certBytes = [Convert]::FromBase64String($env:WIN_CERT_BASE64)
+          $certPath  = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($certPath, $certBytes)
+          $exePath = "dist\L4-Proxy-Test-Server\L4-Proxy-Test-Server.exe"
+          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign `
+            /fd SHA256 `
+            /tr $env:WIN_SIGN_TIMESTAMP_URL `
+            /td SHA256 `
+            /f $certPath `
+            /p $env:WIN_CERT_PASSWORD `
+            $exePath
+          Remove-Item $certPath -Force
+          Write-Host "Signed: $exePath"
 
       - name: Compute checksums
         run: |
@@ -76,11 +111,74 @@ jobs:
       - name: Install PyInstaller
         run: pip install PyInstaller --quiet
 
+      - name: Download static ffmpeg (macOS)
+        run: |
+          mkdir -p build/ffmpeg-macos
+          curl -L --retry 3 -o build/ffmpeg-macos/ffmpeg.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
+          unzip -q -o build/ffmpeg-macos/ffmpeg.zip -d build/ffmpeg-macos/
+          chmod +x build/ffmpeg-macos/ffmpeg
+          echo "FFMPEG_BIN=$(pwd)/build/ffmpeg-macos/ffmpeg" >> "$GITHUB_ENV"
+
       - name: Build macOS .app
         run: pyinstaller pyinstaller-macos.spec
+        env:
+          FFMPEG_BIN: ${{ env.FFMPEG_BIN }}
 
       - name: List build output
         run: find dist -type f | head -30
+
+      - name: Sign and notarize macOS .app
+        if: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP_PATH="dist/L4 Proxy Test Server.app"
+
+          # 1. Import certificate into a temporary keychain
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain"
+          KEYCHAIN_PASS="$(openssl rand -hex 16)"
+          security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode -o "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain
+
+          # 2. Code-sign the app (deep, hardened runtime required for notarization)
+          codesign --deep --force --verify --verbose \
+            --timestamp \
+            --options runtime \
+            --entitlements /dev/null \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            "$APP_PATH"
+          codesign --verify --verbose "$APP_PATH"
+
+          # 3. Zip for notarization upload
+          ditto -c -k --keepParent "$APP_PATH" "$RUNNER_TEMP/notarize.zip"
+
+          # 4. Notarize
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          # 5. Staple
+          xcrun stapler staple "$APP_PATH"
+
+          # 6. Clean up keychain
+          security delete-keychain "$KEYCHAIN_PATH"
 
       - name: Create distribution zip
         run: |
@@ -136,18 +234,24 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
           body: |
             ## Release ${{ needs.release-info.outputs.version }}
-            
+
             ### Desktop Builds
-            - **Windows**: `L4-Proxy-Test-Server.exe` — single-file executable (unsigned)
-            - **macOS**: `L4-Proxy-Test-Server-macos.zip` — app bundle (unsigned)
-            
+
+            FFmpeg is **bundled** — no separate installation required.
+
+            | Platform | File | Notes |
+            |----------|------|-------|
+            | Windows  | `L4-Proxy-Test-Server.exe` | Authenticode signed (if cert configured) |
+            | macOS    | `L4-Proxy-Test-Server-macos.zip` | Developer ID signed + notarized (if cert configured) |
+
             #### Verification
             ```bash
             # Windows (PowerShell)
             (Get-FileHash -Path "L4-Proxy-Test-Server.exe" -Algorithm SHA256).Hash
-            
-            # macOS/Linux
-            sha256sum L4-Proxy-Test-Server-macos.zip
+            # Compare with L4-Proxy-Test-Server.exe.sha256
+
+            # macOS / Linux
+            sha256sum -c L4-Proxy-Test-Server-macos.zip.sha256
             ```
 
-            ⚠️ **Unsigned Builds**: Desktop executables are unsigned. Your OS may show security warnings on first run.
+            > If signing secrets are not configured in the repository, builds are unsigned and your OS may show a security warning on first run.
