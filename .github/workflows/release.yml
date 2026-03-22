@@ -86,12 +86,6 @@ jobs:
             $exePath
           if ($LASTEXITCODE -ne 0) { throw "signtool sign failed (exit $LASTEXITCODE)" }
 
-          # Verify signature exists (allow self-signed cert chain)
-          & $signtool verify /pa $exePath
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "::warning::signtool verify returned $LASTEXITCODE (expected for self-signed cert)"
-          }
-
           Remove-Item $certPath -Force
           Write-Host "Signed: $exePath"
 
