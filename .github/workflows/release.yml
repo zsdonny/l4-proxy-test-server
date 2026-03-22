@@ -255,7 +255,7 @@ jobs:
             ### Desktop Builds
 
             FFmpeg is **bundled** — no separate installation required.
-            Windows builds are **Authenticode-signed**. macOS builds are **Developer ID signed and notarized**.
+            Windows builds are **Authenticode-signed**. macOS builds are unsigned (Gatekeeper workaround in README).
 
             | Platform | File |
             |----------|------|
