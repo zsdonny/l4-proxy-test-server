@@ -60,19 +60,36 @@ jobs:
           WIN_CERT_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
           WIN_SIGN_TIMESTAMP_URL: ${{ vars.WIN_SIGN_TIMESTAMP_URL || 'http://timestamp.digicert.com' }}
         run: |
+          # Decode cert to temp file
           $certBytes = [Convert]::FromBase64String($env:WIN_CERT_BASE64)
           $certPath  = Join-Path $env:RUNNER_TEMP "codesign.pfx"
           [IO.File]::WriteAllBytes($certPath, $certBytes)
+
+          # Find signtool.exe dynamically (SDK version varies on windows-latest)
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" `
+            -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match "x64" } |
+            Sort-Object FullName |
+            Select-Object -Last 1 -ExpandProperty FullName
+          if (-not $signtool) { throw "signtool.exe not found in Windows Kits" }
+          Write-Host "Using signtool: $signtool"
+
           $exePath = "dist\L4-Proxy-Test-Server\L4-Proxy-Test-Server.exe"
-          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign `
+          & $signtool sign `
             /fd SHA256 `
             /tr $env:WIN_SIGN_TIMESTAMP_URL `
             /td SHA256 `
             /f $certPath `
             /p $env:WIN_CERT_PASSWORD `
             $exePath
+          if ($LASTEXITCODE -ne 0) { throw "signtool sign failed (exit $LASTEXITCODE)" }
+
+          # Verify the signature before proceeding
+          & $signtool verify /pa /v $exePath
+          if ($LASTEXITCODE -ne 0) { throw "signtool verify failed — signature is invalid" }
+
           Remove-Item $certPath -Force
-          Write-Host "Signed: $exePath"
+          Write-Host "Signed and verified: $exePath"
 
       - name: Compute checksums
         run: |
