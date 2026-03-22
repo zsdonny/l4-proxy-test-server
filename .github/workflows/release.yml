@@ -42,7 +42,7 @@ jobs:
           Invoke-WebRequest -Uri $url -OutFile $zip -MaximumRetryCount 3
           Expand-Archive -Path $zip -DestinationPath "build\" -Force
           $extracted = Get-ChildItem "build\" -Directory | Where-Object { $_.Name -like "ffmpeg-master-*" } | Select-Object -First 1
-          Rename-Item $extracted.FullName "build\ffmpeg-win64"
+          Move-Item $extracted.FullName "build\ffmpeg-win64"
           $ffmpegExe = "build\ffmpeg-win64\bin\ffmpeg.exe"
           Write-Host "ffmpeg path: $((Resolve-Path $ffmpegExe).Path)"
           echo "FFMPEG_BIN=$((Resolve-Path $ffmpegExe).Path)" >> $env:GITHUB_ENV
