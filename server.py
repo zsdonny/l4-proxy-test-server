@@ -262,12 +262,18 @@ _VIDEO_JS = """
           } else {
             setStatus('connecting', 'Checking for proxied packets on :' + d.ffmpeg_target.split(':')[1] + ' \\u2026');
           }
-        } else if (!isDirect) {
-          riseTicks = 0;
-          stallTicks++;
-          if (stallTicks >= 2) {
-            setStatus('error', 'No UDP packets arriving \\u2014 is your proxy forwarding UDP :' + d.ffmpeg_target.split(':')[1] + ' \\u2192 :' + defaultUdp + '?');
-          }
+                } else {
+                    riseTicks = 0;
+                    stallTicks++;
+                    if (stallTicks >= 2) {
+                        if (!d.ffmpeg_running) {
+                            setStatus('error', 'No UDP packets: FFmpeg is not running. Click Send to restart.');
+                        } else if (isDirect) {
+                            setStatus('error', 'No UDP packets arriving on :' + defaultUdp + '. Click Send to restart stream.');
+                        } else {
+                            setStatus('error', 'No UDP packets arriving \u2014 is your proxy forwarding UDP :' + d.ffmpeg_target.split(':')[1] + ' \u2192 :' + defaultUdp + '?');
+                        }
+                    }
         }
         lastCount = d.udp_packets;
       }).catch(function(){});
@@ -890,6 +896,8 @@ class FFmpegManager:
 
     def _kill_all_ffmpeg(self):
         """Kill every ffmpeg process in the container (catches orphans)."""
+        if not os.path.isdir("/proc"):
+            return
         for entry in os.listdir("/proc"):
             if not entry.isdigit():
                 continue
@@ -936,7 +944,7 @@ class FFmpegManager:
 
     def retarget(self, port):
         """Kill current FFmpeg and restart aiming at a new UDP port."""
-        global udp_pkt_count
+        global udp_pkt_count, _ts_cc_errors, _dgram_bad
         if not self.available:
             return False, "FFmpeg not available"
 
