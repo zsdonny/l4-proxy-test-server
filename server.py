@@ -1,7 +1,6 @@
 """
 Combined TCP/UDP test server for L4 proxy route testing.
-Originally built for Caddy Proxy Manager (https://github.com/fuomag9/caddy-proxy-manager)
-but works with any L4-capable proxy.
+Works with any L4-capable proxy (e.g. Caddy L4, HAProxy, Envoy).
 
 TCP port 11111  – accepts plain HTTP *or* Proxy Protocol v1/v2 prefixed connections.
                   Returns a styled HTML page with connection details and a live video player.
