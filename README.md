@@ -5,6 +5,10 @@
 
 A lightweight test server for verifying **L4 proxy route** configurations. Works with any proxy that supports L4 TCP/UDP routing (e.g. Caddy L4, HAProxy, Envoy). It serves a styled HTML page with connection details (Proxy Protocol v1/v2 or none), and streams **Big Buck Bunny** as a live video via UDP → HTTP chunked stream → browser — all in a single Python script with no pip dependencies.
 
+<img width="633" height="521" alt="image" src="https://github.com/user-attachments/assets/9be50e0f-6c71-4edf-8a82-0f53c2ebd0df" />
+
+<img width="633" height="732" alt="image" src="https://github.com/user-attachments/assets/c361cce7-beaf-4c29-8a95-c4a82577da6a" />
+
 ## Features
 
 - **TCP server** (port `11111`) — **Test this with your L4 TCP proxy.** Accepts plain HTTP or Proxy Protocol v1/v2 prefixed connections. Returns an HTML page showing connection details and a live video player. The `/stream` endpoint serves live MPEG-TS via HTTP chunked transfer.
