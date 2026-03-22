@@ -255,20 +255,24 @@ jobs:
             ### Desktop Builds
 
             FFmpeg is **bundled** — no separate installation required.
+            Windows builds are **Authenticode-signed**. macOS builds are **Developer ID signed and notarized**.
 
-            | Platform | File | Notes |
-            |----------|------|-------|
-            | Windows  | `L4-Proxy-Test-Server.exe` | Authenticode signed (if cert configured) |
-            | macOS    | `L4-Proxy-Test-Server-macos.zip` | Developer ID signed + notarized (if cert configured) |
+            | Platform | File |
+            |----------|------|
+            | Windows  | `L4-Proxy-Test-Server.exe` |
+            | macOS    | `L4-Proxy-Test-Server-macos.zip` |
 
-            #### Verification
-            ```bash
+            #### Verify the download
+
+            ```powershell
             # Windows (PowerShell)
             (Get-FileHash -Path "L4-Proxy-Test-Server.exe" -Algorithm SHA256).Hash
             # Compare with L4-Proxy-Test-Server.exe.sha256
+            ```
 
+            ```bash
             # macOS / Linux
             sha256sum -c L4-Proxy-Test-Server-macos.zip.sha256
             ```
 
-            > If signing secrets are not configured in the repository, builds are unsigned and your OS may show a security warning on first run.
+            For full usage instructions — including how to run, test L4 proxy routing, and interpret the diagnostics — see the **[README on the appbundling branch](https://github.com/zsdonny/l4-proxy-test-server/blob/feature/appbundling/README.md)**.
