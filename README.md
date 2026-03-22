@@ -1,6 +1,7 @@
 # TCP/UDP L4 Proxy Test Server
 
 [![Build and Publish Docker Image](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/docker-publish.yml)
+[![Update JSMpeg](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/update-jsmpeg.yml/badge.svg)](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/update-jsmpeg.yml)
 
 A lightweight test server for verifying **L4 proxy route** configurations. Originally built for testing [Caddy Proxy Manager](https://github.com/fuomag9/caddy-proxy-manager) with L4 support, but works with any proxy that supports L4 TCP/UDP routing. It serves a styled HTML page with connection details (Proxy Protocol v1/v2 or none), and streams **Big Buck Bunny** as a live video via UDP → HTTP chunked stream → browser — all in a single Python script with no pip dependencies.
 
@@ -148,3 +149,4 @@ ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 \
 
 - Source code in this repository is licensed under the [MIT License](LICENSE).
 - Bundled video asset `bigbuckbunny.ts` (Big Buck Bunny) is © Blender Foundation and distributed under [CC-BY-3.0](https://creativecommons.org/licenses/by/3.0/).
+- Bundled `jsmpeg.min.js` ([JSMpeg](https://github.com/phoboslab/jsmpeg)) is © 2017 Dominic Szablewski and distributed under the [MIT License](https://github.com/phoboslab/jsmpeg/blob/master/LICENSE).

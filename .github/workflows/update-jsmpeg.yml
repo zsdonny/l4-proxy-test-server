@@ -1,0 +1,44 @@
+name: Update JSMpeg
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"  # every Monday at midnight UTC
+  workflow_dispatch:       # allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download latest jsmpeg.min.js
+        run: |
+          curl -fsSL -o jsmpeg.min.js.tmp \
+            "https://cdn.jsdelivr.net/gh/phoboslab/jsmpeg@master/jsmpeg.min.js"
+          HEADER='/*! JSMpeg v0.2 - MIT License - Copyright (c) 2017 Dominic Szablewski - https://github.com/phoboslab/jsmpeg */'
+          printf '%s\n' "$HEADER" > jsmpeg.min.js
+          cat jsmpeg.min.js.tmp >> jsmpeg.min.js
+          rm jsmpeg.min.js.tmp
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet jsmpeg.min.js; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add jsmpeg.min.js
+          git commit -m "chore: update jsmpeg.min.js"
+          git push

@@ -37,6 +37,12 @@ VIDEO_URL = "https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny
 PP2_SIG = b"\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a"
 
 # ---------------------------------------------------------------------------
+# Self-hosted JSMpeg library (loaded once at startup)
+# ---------------------------------------------------------------------------
+_JSMPEG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jsmpeg.min.js")
+_JSMPEG_BYTES = open(_JSMPEG_PATH, "rb").read() if os.path.exists(_JSMPEG_PATH) else b""
+
+# ---------------------------------------------------------------------------
 # HTTP stream client tracking  /  UDP packet counter
 # ---------------------------------------------------------------------------
 stream_clients = set()
@@ -108,7 +114,7 @@ def e(v):
 # Video player JS  (placeholders replaced when _VIDEO_JS is built)
 # ---------------------------------------------------------------------------
 _VIDEO_JS = """
-<script src="https://cdn.jsdelivr.net/gh/phoboslab/jsmpeg@master/jsmpeg.min.js"></script>
+<script src="/jsmpeg.min.js"></script>
 <script>
 (function() {
   var player       = null;
@@ -523,6 +529,14 @@ def parse_http_request(data):
         return None
 
 
+def handle_static(conn, method, path):
+    """Serve self-hosted static assets. Returns True if handled."""
+    if path == "/jsmpeg.min.js" and method == "GET":
+        conn.sendall(http_wrap(_JSMPEG_BYTES, content_type="application/javascript"))
+        return True
+    return False
+
+
 def handle_api(conn, method, path, body):
     """Handle API endpoints. Returns True if handled."""
     if path == "/api/ffmpeg-target" and method == "POST":
@@ -590,6 +604,8 @@ def handle_client(conn, addr):
                 if parsed and parsed[1] == "/stream":
                     stream_handoff = True
                     handle_stream_client(conn, addr)
+                elif parsed and handle_static(conn, parsed[0], parsed[1]):
+                    pass
                 elif parsed and parsed[1].startswith("/api/"):
                     handle_api(conn, parsed[0], parsed[1], parsed[2])
                 else:
@@ -609,6 +625,8 @@ def handle_client(conn, addr):
                 if parsed and parsed[1] == "/stream":
                     stream_handoff = True
                     handle_stream_client(conn, addr)
+                elif parsed and handle_static(conn, parsed[0], parsed[1]):
+                    pass
                 elif parsed and parsed[1].startswith("/api/"):
                     handle_api(conn, parsed[0], parsed[1], parsed[2])
                 else:
@@ -621,6 +639,8 @@ def handle_client(conn, addr):
                 if parsed and parsed[1] == "/stream":
                     stream_handoff = True
                     handle_stream_client(conn, addr)
+                elif parsed and handle_static(conn, parsed[0], parsed[1]):
+                    pass
                 elif parsed and parsed[1].startswith("/api/"):
                     print(f"[tcp] API {parsed[0]} {parsed[1]} from {remote}")
                     handle_api(conn, parsed[0], parsed[1], parsed[2])
@@ -646,11 +666,8 @@ def handle_client(conn, addr):
                     if parsed and parsed[1] == "/stream":
                         stream_handoff = True
                         handle_stream_client(conn, addr)
-                    elif parsed and parsed[1].startswith("/api/"):
-                        print(f"[tcp] API {parsed[0]} {parsed[1]} from {remote}")
-                        handle_api(conn, parsed[0], parsed[1], parsed[2])
-                    else:
-                        print(f"[tcp] plain connection from {remote}")
+                    elif parsed and handle_static(conn, parsed[0], parsed[1]):
+                        pass
                         conn.sendall(response_no_pp(remote))
                     return
 
