@@ -1,0 +1,194 @@
+name: Build and Release Desktop + Docker
+
+on:
+  push:
+    tags: [ "v*" ]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release-info:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - name: Get version from tag
+        id: get-version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+  build-windows:
+    runs-on: windows-latest
+    needs: release-info
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install PyInstaller
+        run: pip install PyInstaller --quiet
+
+      - name: Build Windows .exe
+        run: pyinstaller pyinstaller-windows.spec
+
+      - name: Compute checksums
+        run: |
+          $exePath = "dist\L4-Proxy-Test-Server\L4-Proxy-Test-Server.exe"
+          if (Test-Path $exePath) {
+            $hash = (Get-FileHash -Path $exePath -Algorithm SHA256).Hash
+            "$hash  L4-Proxy-Test-Server.exe" | Out-File -FilePath "L4-Proxy-Test-Server.exe.sha256"
+            Write-Host "SHA256: $hash"
+          } else {
+            Write-Error ".exe not found at $exePath"
+            exit 1
+          }
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: |
+            dist/L4-Proxy-Test-Server/**
+            L4-Proxy-Test-Server.exe.sha256
+
+  build-macos:
+    runs-on: macos-latest
+    needs: release-info
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install PyInstaller
+        run: pip install PyInstaller --quiet
+
+      - name: Build macOS .app
+        run: pyinstaller pyinstaller-macos.spec
+
+      - name: Create distribution zip
+        run: |
+          cd dist
+          zip -r "L4-Proxy-Test-Server-macos.zip" "L4 Proxy Test Server.app"
+          cd ..
+
+      - name: Compute checksums
+        run: |
+          sha256sum "dist/L4-Proxy-Test-Server-macos.zip" | tee "L4-Proxy-Test-Server-macos.zip.sha256"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: |
+            dist/L4-Proxy-Test-Server-macos.zip
+            L4-Proxy-Test-Server-macos.zip.sha256
+
+  build-docker:
+    runs-on: ubuntu-latest
+    needs: release-info
+    permissions:
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=tag
+            type=sha
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  create-release:
+    needs: [release-info, build-windows, build-macos, build-docker]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: List artifacts
+        run: find release-artifacts -type f -exec ls -lh {} \;
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          artifacts: "release-artifacts/**/*"
+          artifactErrorsFailBuild: false
+          generateReleaseNotes: true
+          body: |
+            ## Release ${{ needs.release-info.outputs.version }}
+            
+            ### Desktop Builds
+            - **Windows**: `L4-Proxy-Test-Server.exe` — single-file executable (unsigned; includes all assets)
+            - **macOS**: `L4-Proxy-Test-Server-macos.zip` — app bundle (unsigned)
+            
+            #### Verification
+            Checksums are provided for security verification. To verify:
+            ```bash
+            # Windows (PowerShell)
+            (Get-FileHash -Path "L4-Proxy-Test-Server.exe" -Algorithm SHA256).Hash
+            
+            # macOS/Linux
+            sha256sum L4-Proxy-Test-Server-macos.zip
+            ```
+            
+            ### Docker Image
+            - `ghcr.io/${{ github.repository }}:${{ needs.release-info.outputs.version }}`
+            - `ghcr.io/${{ github.repository }}:latest`
+            
+            Pull and run:
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ needs.release-info.outputs.version }}
+            docker run -d --name test-stream \\
+              -p 11111:11111/tcp -p 22222:22222/udp \\
+              ghcr.io/${{ github.repository }}:${{ needs.release-info.outputs.version }}
+            ```
+            
+            ### What's Included
+            - Combined TCP/UDP test server for L4 proxy route testing
+            - Proxy Protocol v1/v2 detection
+            - Live MPEG-TS video streaming via HTTP chunked transfer
+            - FFmpeg integration for video source management
+            - Real-time diagnostics for UDP packet flow
+
+            See [README](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md) for full documentation.
+
+            ⚠️ **Unsigned Builds**: Desktop executables are unsigned. Your OS may show security warnings on first run. SHA256 hashes above can be used to verify authenticity.

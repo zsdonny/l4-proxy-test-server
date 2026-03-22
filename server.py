@@ -14,6 +14,9 @@ On startup, FFmpeg (if available) streams Big Buck Bunny to the local UDP port.
 The embedded HTML page lets the user retarget FFmpeg to a proxied UDP port
 so the video goes: FFmpeg → L4 UDP proxy → server UDP → HTTP stream → browser.
 """
+
+__version__ = "0.1.0"
+
 import html as html_mod
 import json
 import os
@@ -39,7 +42,11 @@ PP2_SIG = b"\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a"
 # Self-hosted JSMpeg library (loaded once at startup)
 # ---------------------------------------------------------------------------
 _JSMPEG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jsmpeg.min.js")
-_JSMPEG_BYTES = open(_JSMPEG_PATH, "rb").read() if os.path.exists(_JSMPEG_PATH) else b""
+try:
+    _JSMPEG_BYTES = open(_JSMPEG_PATH, "rb").read() if os.path.exists(_JSMPEG_PATH) else b""
+except Exception as e:
+    print(f"[warn] failed to load {_JSMPEG_PATH}: {e}", flush=True)
+    _JSMPEG_BYTES = b""
 
 # ---------------------------------------------------------------------------
 # HTTP stream client tracking  /  UDP packet counter
@@ -824,10 +831,20 @@ def udp_server():
 # FFmpeg manager: start / retarget
 # ---------------------------------------------------------------------------
 
-# Docker host address (for sending to ports on the host where the L4 proxy listens)
-DOCKER_HOST = os.environ.get("DOCKER_HOST_ADDR", "host.docker.internal")
+# Detect deployment context: Docker (host.docker.internal) or desktop/local (127.0.0.1)
+# For proxied UDP ports targeting the local machine, this controls where FFmpeg sends packets
+def _detect_docker_context():
+    """Detect if running in Docker. Falls back to localhost for desktop deployments."""
+    # Check for /.dockerenv file (Docker containers have this)
+    if os.path.exists("/.dockerenv"):
+        return os.environ.get("DOCKER_HOST_ADDR", "host.docker.internal")
+    # Not in Docker: use loopback for all targets
+    return "127.0.0.1"
 
-VIDEO_LOCAL = "/app/bigbuckbunny.ts"
+DOCKER_HOST = _detect_docker_context()
+
+# Video asset path: Try bundled .ts file first, fall back to downloading
+VIDEO_LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bigbuckbunny.ts")
 
 class FFmpegManager:
     def __init__(self):
