@@ -11,18 +11,24 @@ cd "$REPO_ROOT"
 # ---------------------------------------------------------------------------
 # Download static ffmpeg for macOS (evermeet.cx - GPL static build)
 # ---------------------------------------------------------------------------
+VENDOR_PATH="$REPO_ROOT/vendor/ffmpeg/macos/ffmpeg"
 FFMPEG_DIR="build/ffmpeg-macos"
 FFMPEG_DL_URL="https://evermeet.cx/ffmpeg/getrelease/zip"
 
-if [ ! -f "$FFMPEG_DIR/ffmpeg" ]; then
+if [ -f "$VENDOR_PATH" ]; then
+    echo "[ffmpeg] Using vendored binary (airgapped)"
+    chmod +x "$VENDOR_PATH"
+    export FFMPEG_BIN="$VENDOR_PATH"
+elif [ ! -f "$FFMPEG_DIR/ffmpeg" ]; then
     echo "[ffmpeg] Downloading static macOS build..."
     mkdir -p "$FFMPEG_DIR"
     curl -L --retry 3 -o "$FFMPEG_DIR/ffmpeg.zip" "$FFMPEG_DL_URL"
     unzip -q -o "$FFMPEG_DIR/ffmpeg.zip" -d "$FFMPEG_DIR/"
     chmod +x "$FFMPEG_DIR/ffmpeg"
+    export FFMPEG_BIN="$REPO_ROOT/$FFMPEG_DIR/ffmpeg"
+else
+    export FFMPEG_BIN="$REPO_ROOT/$FFMPEG_DIR/ffmpeg"
 fi
-
-export FFMPEG_BIN="$REPO_ROOT/$FFMPEG_DIR/ffmpeg"
 echo "[ffmpeg] Using: $FFMPEG_BIN"
 
 echo "[build] Installing build dependencies..."

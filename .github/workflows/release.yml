@@ -24,8 +24,10 @@ jobs:
     env:
       HAS_WIN_CERT: ${{ secrets.WIN_CERT_BASE64 != '' }}
     steps:
-      - name: Checkout
+      - name: Checkout (with LFS for vendored ffmpeg)
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -35,17 +37,24 @@ jobs:
       - name: Install PyInstaller
         run: pip install PyInstaller --quiet
 
-      - name: Download static ffmpeg (Windows)
+      - name: Set up ffmpeg (Windows)
         run: |
-          $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-          $zip = "ffmpeg-win64.zip"
-          Invoke-WebRequest -Uri $url -OutFile $zip -MaximumRetryCount 3
-          Expand-Archive -Path $zip -DestinationPath "build\" -Force
-          $extracted = Get-ChildItem "build\" -Directory | Where-Object { $_.Name -like "ffmpeg-master-*" } | Select-Object -First 1
-          Move-Item $extracted.FullName "build\ffmpeg-win64"
-          $ffmpegExe = "build\ffmpeg-win64\bin\ffmpeg.exe"
-          Write-Host "ffmpeg path: $((Resolve-Path $ffmpegExe).Path)"
-          echo "FFMPEG_BIN=$((Resolve-Path $ffmpegExe).Path)" >> $env:GITHUB_ENV
+          $vendorPath = "vendor\ffmpeg\windows\ffmpeg.exe"
+          if (Test-Path $vendorPath) {
+            Write-Host "[ffmpeg] Using vendored binary"
+            echo "FFMPEG_BIN=$((Resolve-Path $vendorPath).Path)" >> $env:GITHUB_ENV
+          } else {
+            Write-Host "[ffmpeg] Vendored binary not found — downloading..."
+            $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+            $zip = "ffmpeg-win64.zip"
+            Invoke-WebRequest -Uri $url -OutFile $zip -MaximumRetryCount 3
+            Expand-Archive -Path $zip -DestinationPath "build\" -Force
+            $extracted = Get-ChildItem "build\" -Directory | Where-Object { $_.Name -like "ffmpeg-master-*" } | Select-Object -First 1
+            Move-Item $extracted.FullName "build\ffmpeg-win64"
+            $ffmpegExe = "build\ffmpeg-win64\bin\ffmpeg.exe"
+            echo "FFMPEG_BIN=$((Resolve-Path $ffmpegExe).Path)" >> $env:GITHUB_ENV
+          }
+          Write-Host "[ffmpeg] Path: $env:FFMPEG_BIN"
 
       - name: Build Windows .exe
         run: pyinstaller pyinstaller-windows.spec
@@ -117,8 +126,10 @@ jobs:
     env:
       HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
     steps:
-      - name: Checkout
+      - name: Checkout (with LFS for vendored ffmpeg)
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -128,13 +139,22 @@ jobs:
       - name: Install PyInstaller
         run: pip install PyInstaller --quiet
 
-      - name: Download static ffmpeg (macOS)
+      - name: Set up ffmpeg (macOS)
         run: |
-          mkdir -p build/ffmpeg-macos
-          curl -L --retry 3 -o build/ffmpeg-macos/ffmpeg.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
-          unzip -q -o build/ffmpeg-macos/ffmpeg.zip -d build/ffmpeg-macos/
-          chmod +x build/ffmpeg-macos/ffmpeg
-          echo "FFMPEG_BIN=$(pwd)/build/ffmpeg-macos/ffmpeg" >> "$GITHUB_ENV"
+          VENDOR_PATH="vendor/ffmpeg/macos/ffmpeg"
+          if [ -f "$VENDOR_PATH" ]; then
+            echo "[ffmpeg] Using vendored binary"
+            chmod +x "$VENDOR_PATH"
+            echo "FFMPEG_BIN=$(pwd)/$VENDOR_PATH" >> "$GITHUB_ENV"
+          else
+            echo "[ffmpeg] Vendored binary not found — downloading..."
+            mkdir -p build/ffmpeg-macos
+            curl -L --retry 3 -o build/ffmpeg-macos/ffmpeg.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
+            unzip -q -o build/ffmpeg-macos/ffmpeg.zip -d build/ffmpeg-macos/
+            chmod +x build/ffmpeg-macos/ffmpeg
+            echo "FFMPEG_BIN=$(pwd)/build/ffmpeg-macos/ffmpeg" >> "$GITHUB_ENV"
+          fi
+          echo "[ffmpeg] Path: $FFMPEG_BIN"
 
       - name: Build macOS .app
         run: pyinstaller pyinstaller-macos.spec

@@ -109,3 +109,4 @@ ffmpeg -re -stream_loop -1 \
 - Source code: [MIT License](LICENSE)
 - `bigbuckbunny.ts`: © Blender Foundation, [CC-BY-3.0](https://creativecommons.org/licenses/by/3.0/)
 - `jsmpeg.min.js`: © 2017 Dominic Szablewski, [MIT License](https://github.com/phoboslab/jsmpeg/blob/master/LICENSE)
+- `vendor/ffmpeg/*` (vendored binary): FFmpeg contributors, [GPL 2+](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html); source at [ffmpeg.org](https://ffmpeg.org/)

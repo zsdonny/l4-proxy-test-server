@@ -11,20 +11,25 @@ cd "$REPO_ROOT"
 # ---------------------------------------------------------------------------
 # Download static ffmpeg for Windows (BtbN builds - GPL, static, 64-bit)
 # ---------------------------------------------------------------------------
+VENDOR_PATH="$REPO_ROOT/vendor/ffmpeg/windows/ffmpeg.exe"
 FFMPEG_DIR="build/ffmpeg-win64"
 FFMPEG_ZIP="build/ffmpeg-win64.zip"
 FFMPEG_DL_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
 
-if [ ! -f "$FFMPEG_DIR/bin/ffmpeg.exe" ]; then
+if [ -f "$VENDOR_PATH" ]; then
+    echo "[ffmpeg] Using vendored binary (airgapped)"
+    export FFMPEG_BIN="$VENDOR_PATH"
+elif [ ! -f "$FFMPEG_DIR/bin/ffmpeg.exe" ]; then
     echo "[ffmpeg] Downloading static Windows build..."
     mkdir -p build
     curl -L --retry 3 -o "$FFMPEG_ZIP" "$FFMPEG_DL_URL"
     unzip -q -o "$FFMPEG_ZIP" -d build/
     # The zip extracts to a versioned folder name - rename it to a predictable path
     mv build/ffmpeg-master-latest-win64-gpl "$FFMPEG_DIR" 2>/dev/null || true
+    export FFMPEG_BIN="$REPO_ROOT/$FFMPEG_DIR/bin/ffmpeg.exe"
+else
+    export FFMPEG_BIN="$REPO_ROOT/$FFMPEG_DIR/bin/ffmpeg.exe"
 fi
-
-export FFMPEG_BIN="$REPO_ROOT/$FFMPEG_DIR/bin/ffmpeg.exe"
 echo "[ffmpeg] Using: $FFMPEG_BIN"
 
 echo "[build] Installing build dependencies..."
