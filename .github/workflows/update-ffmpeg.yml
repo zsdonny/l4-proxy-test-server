@@ -59,4 +59,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add vendor/ffmpeg/
           git commit -m "chore: update vendored FFmpeg binaries"
+          git pull --rebase origin feature/appbundling
           git push origin feature/appbundling
