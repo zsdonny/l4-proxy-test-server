@@ -3,6 +3,7 @@
 [![Build and Publish Docker Image](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/docker-publish.yml)
 [![Build and Release Desktop](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/release.yml/badge.svg)](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/release.yml)
 [![Update JSMpeg](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/update-jsmpeg.yml/badge.svg)](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/update-jsmpeg.yml)
+[![Update FFmpeg](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/update-ffmpeg.yml/badge.svg)](https://github.com/zsdonny/l4-proxy-test-server/actions/workflows/update-ffmpeg.yml)
 
 A lightweight test server for verifying **L4 proxy route** configurations. Works with any proxy that supports L4 TCP/UDP routing (e.g. Caddy L4, HAProxy, Envoy). Serves a styled HTML page with connection details (Proxy Protocol v1/v2 or none) and streams **Big Buck Bunny** as a live video via UDP -> HTTP chunked stream -> browser -- all in a single Python script with no pip dependencies.
 
