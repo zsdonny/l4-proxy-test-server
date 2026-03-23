@@ -2,8 +2,8 @@ name: Build and Release Desktop
 
 on:
   push:
-    tags: [ "v*" ]
-  workflow_dispatch:  # Allow manual trigger for troubleshooting
+    branches: [ "feature/appbundling" ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,11 +12,11 @@ jobs:
   release-info:
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.get-version.outputs.version }}
+      sha: ${{ steps.get-sha.outputs.sha }}
     steps:
-      - name: Get version from tag
-        id: get-version
-        run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+      - name: Get short SHA
+        id: get-sha
+        run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
   build-windows:
     runs-on: windows-latest
@@ -223,11 +223,16 @@ jobs:
   create-release:
     needs: [release-info, build-windows, build-macos]
     runs-on: ubuntu-latest
-    # Only create release on tag push, not manual dispatch
-    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Force-update latest git tag
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git tag -f latest
+          git push origin latest --force
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -237,42 +242,28 @@ jobs:
       - name: List artifacts
         run: find release-artifacts -type f -exec ls -lh {} \;
 
-      - name: Create GitHub Release
+      - name: Create/Update GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ github.ref_name }}
+          tag: latest
+          name: Latest Build (${{ needs.release-info.outputs.sha }})
+          allowUpdates: true
+          removeArtifacts: true
           artifacts: |
             release-artifacts/windows-exe/L4-Proxy-Test-Server.exe
             release-artifacts/windows-exe/L4-Proxy-Test-Server.exe.sha256
             release-artifacts/macos-app/L4-Proxy-Test-Server-macos.zip
             release-artifacts/macos-app/L4-Proxy-Test-Server-macos.zip.sha256
           artifactErrorsFailBuild: false
-          generateReleaseNotes: true
-          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          generateReleaseNotes: false
+          prerelease: true
           body: |
-            ## Release ${{ needs.release-info.outputs.version }}
-
-            ### Desktop Builds
+            **Latest build** from `feature/appbundling` @ `${{ needs.release-info.outputs.sha }}`
 
             FFmpeg is **bundled** — no separate installation required.
-            Windows builds are **Authenticode-signed**. macOS builds are unsigned (Gatekeeper workaround in README).
+            Windows builds are **Authenticode-signed** (if cert configured). macOS builds are unsigned (see README for Gatekeeper workaround).
 
             | Platform | File |
             |----------|------|
             | Windows  | `L4-Proxy-Test-Server.exe` |
             | macOS    | `L4-Proxy-Test-Server-macos.zip` |
-
-            #### Verify the download
-
-            ```powershell
-            # Windows (PowerShell)
-            (Get-FileHash -Path "L4-Proxy-Test-Server.exe" -Algorithm SHA256).Hash
-            # Compare with L4-Proxy-Test-Server.exe.sha256
-            ```
-
-            ```bash
-            # macOS / Linux
-            sha256sum -c L4-Proxy-Test-Server-macos.zip.sha256
-            ```
-
-            For full usage instructions — including how to run, test L4 proxy routing, and interpret the diagnostics — see the **[README on the appbundling branch](https://github.com/zsdonny/l4-proxy-test-server/blob/feature/appbundling/README.md)**.
