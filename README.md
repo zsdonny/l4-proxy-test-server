@@ -40,23 +40,6 @@ Pre-built binaries with FFmpeg, `bigbuckbunny.ts`, and JSMpeg bundled are on the
 xattr -d com.apple.quarantine "L4 Proxy Test Server.app"
 ```
 
-#### Building locally
-
-```bash
-bash scripts/build-windows.sh   # Output: dist/L4-Proxy-Test-Server.exe
-bash scripts/build-macos.sh     # Output: dist/L4 Proxy Test Server.app
-```
-
-Requires Python 3 and PyInstaller. The scripts install PyInstaller and download a static FFmpeg binary automatically.
-
-### Python (no install)
-
-```bash
-python server.py
-```
-
-Requires Python 3 (standard library only) and FFmpeg in PATH for automatic video. Without FFmpeg the server still runs -- send your own MPEG-TS to the UDP port.
-
 ## Testing
 
 ### TCP
