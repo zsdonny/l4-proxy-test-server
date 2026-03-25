@@ -28,6 +28,26 @@ jobs:
       - name: Check syntax
         run: python -m py_compile server.py
 
-      - name: Verify version constant
-        run: |
-          python -c "exec(open('server.py').read().split('import')[0]); print(f'Version: {__version__}')"
+      - name: Run basic import test
+        run: python -c "import server; print('Server version:', server.__version__)"
+
+  build-check:
+    # Verify PyInstaller specs are valid (don't build, just validate)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PyInstaller
+        run: pip install PyInstaller --quiet
+
+      - name: Validate Windows spec
+        run: python -m py_compile pyinstaller-windows.spec
+
+      - name: Validate macOS spec
+        run: python -m py_compile pyinstaller-macos.spec
