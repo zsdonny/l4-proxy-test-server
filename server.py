@@ -31,8 +31,14 @@ import sys
 import threading
 import time
 
-TCP_PORT = int(os.environ.get("TCP_PORT", "11111"))
-UDP_PORT = int(os.environ.get("UDP_PORT", "22222"))
+try:
+    TCP_PORT = int(os.environ.get("TCP_PORT", "11111"))
+except ValueError:
+    sys.exit("[error] TCP_PORT must be an integer")
+try:
+    UDP_PORT = int(os.environ.get("UDP_PORT", "22222"))
+except ValueError:
+    sys.exit("[error] UDP_PORT must be an integer")
 
 # Big Buck Bunny (c) Blender Foundation | Creative Commons Attribution 3.0
 VIDEO_URL = "https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4"
@@ -44,7 +50,11 @@ PP2_SIG = b"\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a"
 # ---------------------------------------------------------------------------
 _JSMPEG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jsmpeg.min.js")
 try:
-    _JSMPEG_BYTES = open(_JSMPEG_PATH, "rb").read() if os.path.exists(_JSMPEG_PATH) else b""
+    if os.path.exists(_JSMPEG_PATH):
+        with open(_JSMPEG_PATH, "rb") as f:
+            _JSMPEG_BYTES = f.read()
+    else:
+        _JSMPEG_BYTES = b""
 except Exception as e:
     print(f"[warn] failed to load {_JSMPEG_PATH}: {e}", flush=True)
     _JSMPEG_BYTES = b""
@@ -678,28 +688,6 @@ def handle_client(conn, addr):
                     conn.sendall(response_no_pp(remote))
                 return
 
-            # Stop reading once we have a complete HTTP request:
-            # headers finished (\r\n\r\n) AND full body received (Content-Length)
-            hdr_end = data.find(b"\r\n\r\n")
-            if hdr_end != -1:
-                header_block = data[:hdr_end].decode(errors="replace")
-                cl = 0
-                for line in header_block.split("\r\n"):
-                    if line.lower().startswith("content-length:"):
-                        try:
-                            cl = int(line.split(":", 1)[1].strip())
-                        except ValueError:
-                            pass
-                if len(data) >= hdr_end + 4 + cl:
-                    parsed = parse_http_request(data)
-                    if parsed and parsed[1] == "/stream":
-                        stream_handoff = True
-                        handle_stream_client(conn, addr)
-                    elif parsed and handle_static(conn, parsed[0], parsed[1]):
-                        pass
-                        conn.sendall(response_no_pp(remote))
-                    return
-
     except Exception as exc:
         print(f"[tcp] error from {remote}: {exc}")
     finally:
@@ -973,7 +961,7 @@ class FFmpegManager:
 
     def retarget(self, port, ip=None):
         """Kill current FFmpeg and restart aiming at a new UDP host:port."""
-        global udp_pkt_count, _ts_cc_errors, _dgram_bad
+        global udp_pkt_count, _ts_cc_errors, _dgram_bad, _stream_broadcast_log_count
         if not self.available:
             return False, "FFmpeg not available"
 
@@ -995,6 +983,7 @@ class FFmpegManager:
             if self.proc:
                 try:
                     self.proc.kill()
+                    self.proc.wait(timeout=2)
                 except Exception:
                     pass
                 self.proc = None
@@ -1008,6 +997,7 @@ class FFmpegManager:
         # 5. Reset counter, CC state, and flush broadcast queue
         with udp_pkt_lock:
             udp_pkt_count = 0
+        _stream_broadcast_log_count = 0
         with _ts_cc_lock:
             _ts_cc_errors = 0
             _ts_cc_last.clear()

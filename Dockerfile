@@ -4,7 +4,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -r -u 1001 -s /sbin/nologin appuser
 
 WORKDIR /app
 
@@ -15,4 +16,5 @@ COPY bigbuckbunny.ts /app/bigbuckbunny.ts
 EXPOSE 11111/tcp
 EXPOSE 22222/udp
 
+USER appuser
 CMD ["python", "/app/server.py"]
