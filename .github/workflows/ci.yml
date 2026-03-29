@@ -47,7 +47,7 @@ jobs:
         run: pip install PyInstaller --quiet
 
       - name: Validate Windows spec
-        run: python -m py_compile pyinstaller-windows.spec
+        run: python -m py_compile build/pyinstaller-windows.spec
 
       - name: Validate macOS spec
-        run: python -m py_compile pyinstaller-macos.spec
+        run: python -m py_compile build/pyinstaller-macos.spec

@@ -35,18 +35,38 @@ jobs:
       - name: Install PyInstaller
         run: pip install PyInstaller --quiet
 
-      - name: Set up ffmpeg (Windows)
+      - name: Resolve FFmpeg version (Windows)
+        id: ffmpeg-ver-win
+        run: |
+          $release = Invoke-RestMethod "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"
+          $version = $release.published_at.ToString("yyyy-MM-dd")
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "[ffmpeg] Latest release date: $version"
+
+      - name: Cache FFmpeg (Windows)
+        id: cache-ffmpeg-win
+        uses: actions/cache@v4
+        with:
+          path: build\ffmpeg-win64
+          key: ffmpeg-windows-${{ steps.ffmpeg-ver-win.outputs.version }}
+
+      - name: Download FFmpeg (Windows)
+        if: steps.cache-ffmpeg-win.outputs.cache-hit != 'true'
         run: |
           $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
           Invoke-WebRequest -Uri $url -OutFile ffmpeg-win64.zip -MaximumRetryCount 3
           Expand-Archive -Path ffmpeg-win64.zip -DestinationPath "build\" -Force
           $extracted = Get-ChildItem "build\" -Directory | Where-Object { $_.Name -like "ffmpeg-master-*" } | Select-Object -First 1
-          $ffmpegExe = Join-Path $extracted.FullName "bin\ffmpeg.exe"
-          echo "FFMPEG_BIN=$((Resolve-Path $ffmpegExe).Path)" >> $env:GITHUB_ENV
-          Write-Host "[ffmpeg] Path: $env:FFMPEG_BIN"
+          Rename-Item $extracted.FullName "ffmpeg-win64"
+
+      - name: Set FFmpeg path (Windows)
+        run: |
+          $ffmpegExe = Resolve-Path "build\ffmpeg-win64\bin\ffmpeg.exe"
+          echo "FFMPEG_BIN=$ffmpegExe" >> $env:GITHUB_ENV
+          Write-Host "[ffmpeg] Path: $ffmpegExe"
 
       - name: Build Windows .exe
-        run: pyinstaller pyinstaller-windows.spec
+        run: pyinstaller build/pyinstaller-windows.spec
         env:
           FFMPEG_BIN: ${{ env.FFMPEG_BIN }}
 
@@ -74,7 +94,7 @@ jobs:
           if (-not $signtool) { throw "signtool.exe not found in Windows Kits" }
           Write-Host "Using signtool: $signtool"
 
-          $exePath = "dist\L4-Proxy-Test-Server\L4-Proxy-Test-Server.exe"
+          $exePath = "dist\L4-Proxy-Test-Server.exe"
           & $signtool sign `
             /fd SHA256 `
             /tr $env:WIN_SIGN_TIMESTAMP_URL `
@@ -89,7 +109,7 @@ jobs:
 
       - name: Compute checksums
         run: |
-          $exePath = "dist\L4-Proxy-Test-Server\L4-Proxy-Test-Server.exe"
+          $exePath = "dist\L4-Proxy-Test-Server.exe"
           if (Test-Path $exePath) {
             Copy-Item -Path $exePath -Destination "L4-Proxy-Test-Server.exe" -Force
             $hash = (Get-FileHash -Path $exePath -Algorithm SHA256).Hash
@@ -124,19 +144,37 @@ jobs:
           python-version: '3.11'
 
       - name: Install PyInstaller
-        run: pip install PyInstaller --quiet
+        run: pip install PyInstaller Pillow --quiet
 
-      - name: Set up ffmpeg (macOS)
+      - name: Resolve FFmpeg version (macOS)
+        id: ffmpeg-ver-mac
+        run: |
+          version=$(curl -fsSL https://evermeet.cx/ffmpeg/info/ffmpeg/release | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "[ffmpeg] Latest version: $version"
+
+      - name: Cache FFmpeg (macOS)
+        id: cache-ffmpeg-mac
+        uses: actions/cache@v4
+        with:
+          path: build/ffmpeg-macos
+          key: ffmpeg-macos-${{ steps.ffmpeg-ver-mac.outputs.version }}
+
+      - name: Download FFmpeg (macOS)
+        if: steps.cache-ffmpeg-mac.outputs.cache-hit != 'true'
         run: |
           mkdir -p build/ffmpeg-macos
           curl -L --retry 3 -o build/ffmpeg-macos/ffmpeg.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
           unzip -q -o build/ffmpeg-macos/ffmpeg.zip -d build/ffmpeg-macos/
           chmod +x build/ffmpeg-macos/ffmpeg
+
+      - name: Set FFmpeg path (macOS)
+        run: |
           echo "FFMPEG_BIN=$(pwd)/build/ffmpeg-macos/ffmpeg" >> "$GITHUB_ENV"
-          echo "[ffmpeg] Path: $FFMPEG_BIN"
+          echo "[ffmpeg] Path: $(pwd)/build/ffmpeg-macos/ffmpeg"
 
       - name: Build macOS .app
-        run: pyinstaller pyinstaller-macos.spec
+        run: pyinstaller build/pyinstaller-macos.spec
         env:
           FFMPEG_BIN: ${{ env.FFMPEG_BIN }}
 

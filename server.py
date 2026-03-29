@@ -40,6 +40,24 @@ try:
 except ValueError:
     sys.exit("[error] UDP_PORT must be an integer")
 
+
+def _runtime_base_dir():
+    if getattr(sys, 'frozen', False):
+        return getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(sys.executable)))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def _asset_path(name):
+    base_dir = _runtime_base_dir()
+    candidates = [
+        os.path.join(base_dir, 'assets', name),
+        os.path.join(base_dir, name),
+    ]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return candidates[0]
+
 # Big Buck Bunny (c) Blender Foundation | Creative Commons Attribution 3.0
 VIDEO_URL = "https://download.blender.org/peach/bigbuckbunny_movies/BigBuckBunny_320x180.mp4"
 
@@ -48,7 +66,7 @@ PP2_SIG = b"\x0d\x0a\x0d\x0a\x00\x0d\x0a\x51\x55\x49\x54\x0a"
 # ---------------------------------------------------------------------------
 # Self-hosted JSMpeg library (loaded once at startup)
 # ---------------------------------------------------------------------------
-_JSMPEG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "jsmpeg.min.js")
+_JSMPEG_PATH = _asset_path("jsmpeg.min.js")
 try:
     if os.path.exists(_JSMPEG_PATH):
         with open(_JSMPEG_PATH, "rb") as f:
@@ -333,7 +351,7 @@ _VIDEO_JS = """
   function connectPlayer() {
     if (player) { try { player.destroy(); } catch(x){} player = null; }
     if (typeof JSMpeg === 'undefined') {
-      setStatus('error', 'JSMpeg failed to load from CDN.');
+            setStatus('error', 'JSMpeg failed to load from the bundled asset.');
       return;
     }
     var streamUrl = location.origin + '/stream';
@@ -855,7 +873,7 @@ def _detect_docker_context():
 DOCKER_HOST = _detect_docker_context()
 
 # Video asset path: Try bundled .ts file first, fall back to downloading
-VIDEO_LOCAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bigbuckbunny.ts")
+VIDEO_LOCAL = _asset_path("bigbuckbunny.ts")
 
 def _find_ffmpeg():
     """Return path to ffmpeg binary, preferring the one bundled by PyInstaller."""

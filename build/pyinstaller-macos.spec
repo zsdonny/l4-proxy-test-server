@@ -16,12 +16,12 @@ else:
     print('WARNING: FFMPEG_BIN not set or file not found — ffmpeg will NOT be bundled.')
 
 a = Analysis(
-    ['server.py'],
+    ['../server.py'],
     pathex=[],
     binaries=ffmpeg_binaries,
     datas=[
-        ('jsmpeg.min.js', '.'),
-        ('bigbuckbunny.ts', '.'),
+        ('../assets/jsmpeg.min.js', 'assets'),
+        ('../assets/bigbuckbunny.ts', 'assets'),
     ],
     hiddenimports=[
         'queue',
@@ -67,7 +67,7 @@ exe = EXE(
 app = BUNDLE(
     exe,
     name='L4 Proxy Test Server.app',
-    icon=None,
+    icon='icon.icns',
     bundle_identifier='com.example.l4-proxy-test-server',
     info_plist={
         'NSPrincipalClass': 'NSApplication',

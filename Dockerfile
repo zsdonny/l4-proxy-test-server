@@ -10,8 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
 WORKDIR /app
 
 COPY server.py /app/server.py
-COPY jsmpeg.min.js /app/jsmpeg.min.js
-COPY bigbuckbunny.ts /app/bigbuckbunny.ts
+COPY assets/ /app/assets/
 
 EXPOSE 11111/tcp
 EXPOSE 22222/udp

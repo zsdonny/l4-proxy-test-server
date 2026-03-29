@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#131929"/>
+      <stop offset="100%" stop-color="#0a0f1c"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e4070"/>
+      <stop offset="100%" stop-color="#0d2244"/>
+    </linearGradient>
+    <linearGradient id="tcpLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#00c8ff" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#00c8ff"/>
+    </linearGradient>
+    <linearGradient id="udpLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ffaa00" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#ffaa00"/>
+    </linearGradient>
+    <linearGradient id="outLine" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#00e0aa"/>
+      <stop offset="100%" stop-color="#00e0aa" stop-opacity="0.05"/>
+    </linearGradient>
+    <filter id="glow-node" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="256" height="256" rx="40" fill="url(#bg)"/>
+
+  <!-- TCP input line + endpoint dot -->
+  <line x1="32" y1="98" x2="110" y2="122" stroke="url(#tcpLine)" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="32" cy="98" r="9" fill="#00c8ff"/>
+
+  <!-- UDP input line + endpoint dot -->
+  <line x1="32" y1="158" x2="110" y2="134" stroke="url(#udpLine)" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="32" cy="158" r="9" fill="#ffaa00"/>
+
+  <!-- Output line -->
+  <line x1="146" y1="128" x2="208" y2="128" stroke="url(#outLine)" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Signal arcs (broadcast) -->
+  <path d="M 210 102 Q 240 128 210 154" stroke="#00e0aa" stroke-width="7"  fill="none" stroke-linecap="round"/>
+  <path d="M 222 84  Q 258 128 222 172" stroke="#00e0aa" stroke-width="4.5" fill="none" stroke-linecap="round" opacity="0.45"/>
+
+  <!-- Central hexagon proxy node -->
+  <polygon points="128,82 162,101 162,155 128,174 94,155 94,101"
+    fill="url(#nodeGrad)" stroke="#3a80cc" stroke-width="5" filter="url(#glow-node)"/>
+
+  <!-- Play triangle -->
+  <polygon points="116,107 116,149 152,128" fill="#e8f4ff"/>
+</svg>

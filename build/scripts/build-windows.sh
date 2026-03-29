@@ -5,21 +5,17 @@
 
 set -e
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 # ---------------------------------------------------------------------------
 # Download static ffmpeg for Windows (BtbN builds - GPL, static, 64-bit)
 # ---------------------------------------------------------------------------
-VENDOR_PATH="$REPO_ROOT/vendor/ffmpeg/windows/ffmpeg.exe"
 FFMPEG_DIR="build/ffmpeg-win64"
 FFMPEG_ZIP="build/ffmpeg-win64.zip"
 FFMPEG_DL_URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
 
-if [ -f "$VENDOR_PATH" ]; then
-    echo "[ffmpeg] Using vendored binary (airgapped)"
-    export FFMPEG_BIN="$VENDOR_PATH"
-elif [ ! -f "$FFMPEG_DIR/bin/ffmpeg.exe" ]; then
+if [ ! -f "$FFMPEG_DIR/bin/ffmpeg.exe" ]; then
     echo "[ffmpeg] Downloading static Windows build..."
     mkdir -p build
     curl -L --retry 3 -o "$FFMPEG_ZIP" "$FFMPEG_DL_URL"
@@ -39,12 +35,12 @@ echo "[build] Cleaning previous builds..."
 rm -rf build/pyinstaller dist "L4-Proxy-Test-Server.exe" 2>/dev/null || true
 
 echo "[build] Building Windows .exe with PyInstaller..."
-pyinstaller pyinstaller-windows.spec
+pyinstaller build/pyinstaller-windows.spec
 
-if [ -f "dist/L4-Proxy-Test-Server/L4-Proxy-Test-Server.exe" ]; then
+if [ -f "dist/L4-Proxy-Test-Server.exe" ]; then
     echo "[build] Windows .exe built successfully"
-    echo "[build] Output: dist/L4-Proxy-Test-Server/L4-Proxy-Test-Server.exe"
-    du -sh "dist/L4-Proxy-Test-Server" || true
+    echo "[build] Output: dist/L4-Proxy-Test-Server.exe"
+    du -sh "dist/L4-Proxy-Test-Server.exe" || true
 else
     echo "[build] Build failed: .exe not found in dist/"
     exit 1

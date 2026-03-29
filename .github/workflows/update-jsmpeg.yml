@@ -21,14 +21,14 @@ jobs:
           curl -fsSL -o jsmpeg.min.js.tmp \
             "https://cdn.jsdelivr.net/gh/phoboslab/jsmpeg@master/jsmpeg.min.js"
           HEADER='/*! JSMpeg v0.2 - MIT License - Copyright (c) 2017 Dominic Szablewski - https://github.com/phoboslab/jsmpeg */'
-          printf '%s\n' "$HEADER" > jsmpeg.min.js
-          cat jsmpeg.min.js.tmp >> jsmpeg.min.js
+          printf '%s\n' "$HEADER" > assets/jsmpeg.min.js
+          cat jsmpeg.min.js.tmp >> assets/jsmpeg.min.js
           rm jsmpeg.min.js.tmp
 
       - name: Check for changes
         id: diff
         run: |
-          if git diff --quiet jsmpeg.min.js; then
+          if git diff --quiet assets/jsmpeg.min.js; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -39,6 +39,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add jsmpeg.min.js
-          git commit -m "chore: update jsmpeg.min.js"
+          git add assets/jsmpeg.min.js
+          git commit -m "chore: update assets/jsmpeg.min.js"
           git push

@@ -17,12 +17,12 @@ else:
     print('WARNING: FFMPEG_BIN not set or file not found — ffmpeg will NOT be bundled.')
 
 a = Analysis(
-    ['server.py'],
+    ['../server.py'],
     pathex=[],
     binaries=ffmpeg_binaries,
     datas=[
-        ('jsmpeg.min.js', '.'),
-        ('bigbuckbunny.ts', '.'),
+        ('../assets/jsmpeg.min.js', 'assets'),
+        ('../assets/bigbuckbunny.ts', 'assets'),
     ],
     hiddenimports=[
         'queue',
@@ -59,19 +59,9 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=True,  # Show console window to display connection info and logs
+    icon='icon.ico',
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='L4-Proxy-Test-Server',
 )

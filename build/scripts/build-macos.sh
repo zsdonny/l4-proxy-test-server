@@ -5,21 +5,16 @@
 
 set -e
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 # ---------------------------------------------------------------------------
 # Download static ffmpeg for macOS (evermeet.cx - GPL static build)
 # ---------------------------------------------------------------------------
-VENDOR_PATH="$REPO_ROOT/vendor/ffmpeg/macos/ffmpeg"
 FFMPEG_DIR="build/ffmpeg-macos"
 FFMPEG_DL_URL="https://evermeet.cx/ffmpeg/getrelease/zip"
 
-if [ -f "$VENDOR_PATH" ]; then
-    echo "[ffmpeg] Using vendored binary (airgapped)"
-    chmod +x "$VENDOR_PATH"
-    export FFMPEG_BIN="$VENDOR_PATH"
-elif [ ! -f "$FFMPEG_DIR/ffmpeg" ]; then
+if [ ! -f "$FFMPEG_DIR/ffmpeg" ]; then
     echo "[ffmpeg] Downloading static macOS build..."
     mkdir -p "$FFMPEG_DIR"
     curl -L --retry 3 -o "$FFMPEG_DIR/ffmpeg.zip" "$FFMPEG_DL_URL"
@@ -38,7 +33,7 @@ echo "[build] Cleaning previous builds..."
 rm -rf build/pyinstaller dist "L4 Proxy Test Server.app" 2>/dev/null || true
 
 echo "[build] Building macOS .app with PyInstaller..."
-pyinstaller pyinstaller-macos.spec
+pyinstaller build/pyinstaller-macos.spec
 
 if [ -d "dist/L4 Proxy Test Server.app" ]; then
     echo "[build] macOS .app built successfully"
