@@ -1,4 +1,4 @@
-name: Docker Build Check (main branch)
+name: Build and Release Docker
 
 on:
   push:
